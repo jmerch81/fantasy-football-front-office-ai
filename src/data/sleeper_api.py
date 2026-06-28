@@ -56,6 +56,35 @@ def clean_player_data(players_df):
 
     return clean_df
 
+def validate_player_data(players_df):
+    """
+    Validate that the dataset contains the required columns
+    and enough records for downstream processing.
+    """
+
+    required_columns = [
+        "player_id",
+        "full_name",
+        "position",
+        "team",
+    ]
+
+    missing_columns = [
+        col for col in required_columns
+        if col not in players_df.columns
+    ]
+
+    if missing_columns:
+        raise ValueError(
+            f"Missing required columns: {missing_columns}"
+        )
+
+    if len(players_df) < 1000:
+        raise ValueError(
+            "Player dataset appears incomplete."
+        )
+
+    print("✅ Data validation passed.")
 
 if __name__ == "__main__":
     print("Starting Sleeper API player data pipeline...")
@@ -64,6 +93,7 @@ if __name__ == "__main__":
     print(f"Raw players pulled: {len(players)}")
 
     clean_players = clean_player_data(players)
+    validate_player_data(clean_players)
     print(f"Clean players created: {len(clean_players)}")
 
     players.to_csv(RAW_DATA_DIR / "sleeper_players_raw.csv", index=False)
