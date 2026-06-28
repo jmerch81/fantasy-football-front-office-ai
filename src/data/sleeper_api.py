@@ -1,9 +1,17 @@
 import requests
 import pandas as pd
 
+from pathlib import Path
+
 
 SLEEPER_PLAYERS_URL = "https://api.sleeper.app/v1/players/nfl"
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+RAW_DATA_DIR = PROJECT_ROOT / "data" / "raw"
+PROCESSED_DATA_DIR = PROJECT_ROOT / "data" / "processed"
+
+RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
+PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 def fetch_nfl_players():
     """
@@ -50,20 +58,16 @@ def clean_player_data(players_df):
 
 
 if __name__ == "__main__":
+    print("Starting Sleeper API player data pipeline...")
+
     players = fetch_nfl_players()
+    print(f"Raw players pulled: {len(players)}")
 
     clean_players = clean_player_data(players)
+    print(f"Clean players created: {len(clean_players)}")
 
-    players.to_csv(
-        "data/raw/sleeper_players_raw.csv",
-        index=False
-    )
+    players.to_csv(RAW_DATA_DIR / "sleeper_players_raw.csv", index=False)
+    clean_players.to_csv(PROCESSED_DATA_DIR / "sleeper_players_clean.csv", index=False)
 
-    clean_players.to_csv(
-        "data/processed/sleeper_players_clean.csv",
-        index=False
-    )
-
+    print("Files saved successfully.")
     print(clean_players.head())
-
-    print(f"Total players pulled: {len(clean_players)}")
