@@ -51,7 +51,19 @@ def clean_player_data(players_df):
 
 if __name__ == "__main__":
     players = fetch_nfl_players()
+
     clean_players = clean_player_data(players)
 
+    players.to_csv(
+        "data/raw/sleeper_players_raw.csv",
+        index=False
+    )
+
+    clean_players.to_csv(
+        "data/processed/sleeper_players_clean.csv",
+        index=False
+    )
+
     print(clean_players.head())
+
     print(f"Total players pulled: {len(clean_players)}")
