@@ -1,6 +1,8 @@
 import pandas as pd
 import streamlit as st
 from pathlib import Path
+from src.executives.front_office import FrontOffice
+from src.meetings.executive_meeting import ExecutiveMeeting
 
 st.set_page_config(
     page_title="Fantasy Football Front Office AI",
@@ -8,7 +10,7 @@ st.set_page_config(
     layout="wide"
 )
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parent
 PLAYER_DATA_PATH = PROJECT_ROOT / "data" / "processed" / "sleeper_players_clean.csv"
 
 players = pd.read_csv(PLAYER_DATA_PATH)
@@ -105,3 +107,35 @@ if search:
 st.dataframe(filtered_players, use_container_width=True)
 
 st.write(f"Showing {len(filtered_players):,} players")
+
+st.header("🏛 Tuesday Executive Meeting")
+
+front_office = FrontOffice()
+
+meeting = ExecutiveMeeting(
+    meeting_name="Tuesday Executive Meeting",
+    president=front_office.president,
+    attendees=front_office.executives,
+)
+
+st.success(meeting.call_to_order())
+
+reports = meeting.collect_reports()
+
+for report in reports:
+
+    with st.container():
+
+        st.subheader(report.executive)
+
+        st.write(f"**Recommendation:** {report.recommendation}")
+
+        st.progress(report.confidence)
+
+        st.caption(report.justification)
+
+        st.divider()
+
+st.header("👔 President's Summary")
+
+st.info(meeting.summarize_meeting())
