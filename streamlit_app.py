@@ -99,30 +99,71 @@ col4.metric("Positions", positions)
 
 st.divider()
 
+st.sidebar.header("🏈 League Import")
+
+sleeper_username = st.sidebar.text_input(
+    "Sleeper Username",
+    value="jmerch81",
+)
+
+selected_season = st.sidebar.number_input(
+    "Season",
+    min_value=2020,
+    max_value=2030,
+    value=2026,
+    step=1,
+)
+
 client = SleeperClient()
 
-user = client.get_user("jmerch81")
+try:
+    user = client.get_user(sleeper_username)
 
-league = client.get_user_leagues(
-    user["user_id"],
-    2026
-)[0]
+    leagues = client.get_user_leagues(
+        user["user_id"],
+        int(selected_season),
+    )
 
-rosters = client.get_rosters(
-    league["league_id"]
-)
+    if not leagues:
+        st.error(
+            f"No Sleeper leagues found for {sleeper_username} in {selected_season}."
+        )
+        st.stop()
 
-players = client.get_players()
+    league_options = {
+        league["name"]: league
+        for league in leagues
+    }
 
-mapper = SleeperLeagueMapper()
+    selected_league_name = st.sidebar.selectbox(
+        "Select League",
+        list(league_options.keys()),
+    )
 
-league_state = mapper.build_league_state(
-    user=user,
-    league=league,
-    rosters=rosters,
-    players=players,
-)
+    league = league_options[selected_league_name]
 
+    rosters = client.get_rosters(
+        league["league_id"]
+    )
+
+    player_database = client.get_players()
+
+    mapper = SleeperLeagueMapper()
+
+    league_state = mapper.build_league_state(
+        user=user,
+        league=league,
+        rosters=rosters,
+        players=player_database,
+    )
+
+    st.sidebar.success("League connected")
+
+except Exception as error:
+    st.error("Unable to connect to Sleeper league.")
+    st.exception(error)
+    st.stop()
+    
 st.header("👑 Owner Dashboard")
 
 owner_col1, owner_col2, owner_col3, owner_col4 = st.columns(4)
