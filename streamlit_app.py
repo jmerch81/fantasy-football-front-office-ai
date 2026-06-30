@@ -92,6 +92,95 @@ def clean_display_value(value, fallback="N/A"):
     return value
 
 
+def find_demo_player(players_df, player_name, fallback_position, used_player_ids):
+    name_matches = (
+        players_df["full_name"]
+        .fillna("")
+        .astype(str)
+        .str.lower()
+        == player_name.lower()
+    )
+
+    exact_matches = players_df[name_matches].copy()
+
+    if not exact_matches.empty:
+        if "status" in exact_matches.columns:
+            active_matches = exact_matches[exact_matches["status"] == "Active"]
+            if not active_matches.empty:
+                exact_matches = active_matches
+
+        if "team" in exact_matches.columns:
+            team_matches = exact_matches[exact_matches["team"].notna()]
+            if not team_matches.empty:
+                exact_matches = team_matches
+
+        player = exact_matches.iloc[0].to_dict()
+        player_id = player.get("player_id")
+
+        if player_id and not pd.isna(player_id):
+            used_player_ids.add(player_id)
+
+        return player
+
+    fallback_players = players_df[
+        (players_df["status"] == "Active")
+        & (players_df["position"] == fallback_position)
+        & (players_df["team"].notna())
+    ].copy()
+
+    if "player_id" in fallback_players.columns:
+        fallback_players = fallback_players[
+            ~fallback_players["player_id"].isin(used_player_ids)
+        ]
+
+    if fallback_players.empty:
+        return None
+
+    player = fallback_players.iloc[0].to_dict()
+    player_id = player.get("player_id")
+
+    if player_id and not pd.isna(player_id):
+        used_player_ids.add(player_id)
+
+    return player
+
+
+def build_demo_roster(players_df):
+    demo_player_targets = [
+        ("Josh Allen", "QB"),
+        ("Christian McCaffrey", "RB"),
+        ("Bijan Robinson", "RB"),
+        ("CeeDee Lamb", "WR"),
+        ("Justin Jefferson", "WR"),
+        ("Ja'Marr Chase", "WR"),
+        ("Travis Kelce", "TE"),
+        ("Brandon Aubrey", "K"),
+        ("Dallas Cowboys", "DEF"),
+        ("Lamar Jackson", "QB"),
+        ("Jahmyr Gibbs", "RB"),
+        ("Amon-Ra St. Brown", "WR"),
+        ("Puka Nacua", "WR"),
+        ("Sam LaPorta", "TE"),
+        ("Baltimore Ravens", "DEF"),
+    ]
+
+    used_player_ids = set()
+    demo_roster = []
+
+    for player_name, fallback_position in demo_player_targets:
+        player = find_demo_player(
+            players_df=players_df,
+            player_name=player_name,
+            fallback_position=fallback_position,
+            used_player_ids=used_player_ids,
+        )
+
+        if player:
+            demo_roster.append(player)
+
+    return demo_roster
+
+
 st.markdown(
     """
     <div class="main-title">🏟️ Fantasy Football Front Office AI</div>
@@ -191,23 +280,13 @@ try:
     )
 
     if use_demo_roster and len(league_state.roster) == 0:
-        demo_players = (
-            players_df[
-                (players_df["status"] == "Active")
-                & (players_df["position"].isin(["QB", "RB", "WR", "TE", "K", "DEF"]))
-                & (players_df["team"].notna())
-            ]
-            .dropna(subset=["full_name", "position", "team"])
-            .groupby("position")
-            .head(3)
-            .to_dict("records")
-        )
+        demo_players = build_demo_roster(players_df)
 
         league_state.roster = demo_players
         league_state.starters = demo_players[:9]
         league_state.bench = demo_players[9:]
 
-        st.sidebar.info("Demo roster loaded")
+        st.sidebar.info("Curated demo roster loaded")
 
     st.sidebar.success("League connected")
 
