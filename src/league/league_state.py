@@ -23,7 +23,7 @@ class LeagueState:
 
     # Team Information
     roster: List[Dict] = field(default_factory=list)
-    starters: List[str] = field(default_factory=list)
+    starters: List[Dict] = field(default_factory=list)
     bench: List[str] = field(default_factory=list)
 
     # Opponent

@@ -28,6 +28,11 @@ class SleeperLeagueMapper:
             players=players,
         )
 
+        starter_players = self._map_player_ids_to_players(
+            player_ids=starter_ids,
+            players=players,
+        )
+
         return LeagueState(
             league_id=league["league_id"],
             league_name=league["name"],
@@ -36,7 +41,7 @@ class SleeperLeagueMapper:
             owner_name=user["display_name"],
             owner_team_name=user["display_name"],
             roster=roster_players,
-            starters=starter_ids,
+            starters=starter_players,
             bench=bench_players,
             waiver_order=owner_roster.get("settings", {}).get("waiver_position"),
             faab_remaining=owner_roster.get("settings", {}).get("waiver_budget_used"),

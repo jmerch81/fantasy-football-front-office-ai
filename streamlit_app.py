@@ -166,6 +166,77 @@ priority_col4.metric(
 
 st.divider()
 
+st.divider()
+
+st.header("🏈 Live Roster")
+
+if len(league_state.roster) == 0:
+    st.warning(
+        "Roster not drafted yet. Complete a draft or connect a league with active rosters to activate roster analysis."
+    )
+else:
+    positions = ["QB", "RB", "WR", "TE", "K", "DEF"]
+
+    for position in positions:
+        position_players = [
+            player for player in league_state.roster
+            if player.get("position") == position
+        ]
+
+        if position_players:
+            st.subheader(position)
+
+            cols = st.columns(3)
+
+            for index, player in enumerate(position_players):
+                with cols[index % 3]:
+                    st.markdown(
+                        f"""
+<div style="
+    border: 1px solid #333;
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 16px;
+    background-color: #111827;
+">
+<h4>{player.get("full_name", "Unknown Player")}</h4>
+<p><strong>Team:</strong> {player.get("team", "FA")}</p>
+<p><strong>Position:</strong> {player.get("position", "N/A")}</p>
+<p><strong>Status:</strong> {player.get("status", "Unknown")}</p>
+<p><strong>Injury:</strong> {player.get("injury_status") or "None"}</p>
+</div>
+""",
+                        unsafe_allow_html=True,
+                    )
+
+    bench_players = league_state.bench
+
+    if bench_players:
+        st.subheader("Bench")
+
+        cols = st.columns(3)
+
+        for index, player in enumerate(bench_players):
+            with cols[index % 3]:
+                st.markdown(
+                    f"""
+<div style="
+    border: 1px solid #333;
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 16px;
+    background-color: #111827;
+">
+<h4>{player.get("full_name", "Unknown Player")}</h4>
+<p><strong>Team:</strong> {player.get("team", "FA")}</p>
+<p><strong>Position:</strong> {player.get("position", "N/A")}</p>
+<p><strong>Status:</strong> {player.get("status", "Unknown")}</p>
+<p><strong>Injury:</strong> {player.get("injury_status") or "None"}</p>
+</div>
+""",
+                    unsafe_allow_html=True,
+                )
+
 st.header("🏢 Executive Staff Status")
 
 front_office = FrontOffice()
