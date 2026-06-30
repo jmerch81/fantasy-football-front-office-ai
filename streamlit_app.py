@@ -79,6 +79,19 @@ PLAYER_DATA_PATH = PROJECT_ROOT / "data" / "processed" / "sleeper_players_clean.
 players_df = pd.read_csv(PLAYER_DATA_PATH)
 
 
+def clean_display_value(value, fallback="N/A"):
+    if pd.isna(value):
+        return fallback
+
+    if str(value).lower() == "nan":
+        return fallback
+
+    if value == "":
+        return fallback
+
+    return value
+
+
 st.markdown(
     """
     <div class="main-title">🏟️ Fantasy Football Front Office AI</div>
@@ -182,8 +195,9 @@ try:
             players_df[
                 (players_df["status"] == "Active")
                 & (players_df["position"].isin(["QB", "RB", "WR", "TE", "K", "DEF"]))
+                & (players_df["team"].notna())
             ]
-            .dropna(subset=["full_name", "position"])
+            .dropna(subset=["full_name", "position", "team"])
             .groupby("position")
             .head(3)
             .to_dict("records")
@@ -306,11 +320,11 @@ else:
     margin-bottom: 16px;
     background-color: #111827;
 ">
-<h4>{player.get("full_name", "Unknown Player")}</h4>
-<p><strong>Team:</strong> {player.get("team", "FA")}</p>
-<p><strong>Position:</strong> {player.get("position", "N/A")}</p>
-<p><strong>Status:</strong> {player.get("status", "Unknown")}</p>
-<p><strong>Injury:</strong> {player.get("injury_status") or "None"}</p>
+<h4>{clean_display_value(player.get("full_name"), "Unknown Player")}</h4>
+<p><strong>Team:</strong> {clean_display_value(player.get("team"), "FA")}</p>
+<p><strong>Position:</strong> {clean_display_value(player.get("position"), "N/A")}</p>
+<p><strong>Status:</strong> {clean_display_value(player.get("status"), "Unknown")}</p>
+<p><strong>Injury:</strong> {clean_display_value(player.get("injury_status"), "None")}</p>
 </div>
 """,
                         unsafe_allow_html=True,
@@ -332,11 +346,11 @@ else:
     margin-bottom: 16px;
     background-color: #111827;
 ">
-<h4>{player.get("full_name", "Unknown Player")}</h4>
-<p><strong>Team:</strong> {player.get("team", "FA")}</p>
-<p><strong>Position:</strong> {player.get("position", "N/A")}</p>
-<p><strong>Status:</strong> {player.get("status", "Unknown")}</p>
-<p><strong>Injury:</strong> {player.get("injury_status") or "None"}</p>
+<h4>{clean_display_value(player.get("full_name"), "Unknown Player")}</h4>
+<p><strong>Team:</strong> {clean_display_value(player.get("team"), "FA")}</p>
+<p><strong>Position:</strong> {clean_display_value(player.get("position"), "N/A")}</p>
+<p><strong>Status:</strong> {clean_display_value(player.get("status"), "Unknown")}</p>
+<p><strong>Injury:</strong> {clean_display_value(player.get("injury_status"), "None")}</p>
 </div>
 """,
                     unsafe_allow_html=True,
