@@ -3,6 +3,8 @@ import streamlit as st
 from pathlib import Path
 from src.executives.front_office import FrontOffice
 from src.meetings.executive_meeting import ExecutiveMeeting
+from src.integrations.sleeper import SleeperClient
+from src.league.sleeper_mapper import SleeperLeagueMapper
 
 st.set_page_config(
     page_title="Fantasy Football Front Office AI",
@@ -69,7 +71,7 @@ st.markdown(
 PROJECT_ROOT = Path(__file__).resolve().parent
 PLAYER_DATA_PATH = PROJECT_ROOT / "data" / "processed" / "sleeper_players_clean.csv"
 
-players = pd.read_csv(PLAYER_DATA_PATH)
+players_df = pd.read_csv(PLAYER_DATA_PATH)
 
 st.markdown(
     """
@@ -84,10 +86,10 @@ st.write("Welcome back, Mr. Merchant. Your AI front office is standing by.")
 
 col1, col2, col3, col4 = st.columns(4)
 
-total_players = len(players)
-active_players = len(players[players["status"] == "Active"]) if "status" in players.columns else 0
-teams = players["team"].nunique()
-positions = players["position"].nunique()
+total_players = len(players_df)
+active_players = len(players_df[players_df["status"] == "Active"]) if "status" in players_df.columns else 0
+teams = players_df["team"].nunique()
+positions = players_df["position"].nunique()
 
 col1.metric("NFL Players", f"{total_players:,}")
 col2.metric("Active Players", f"{active_players:,}")
@@ -96,14 +98,38 @@ col4.metric("Positions", positions)
 
 st.divider()
 
+client = SleeperClient()
+
+user = client.get_user("jmerch81")
+
+league = client.get_user_leagues(
+    user["user_id"],
+    2026
+)[0]
+
+rosters = client.get_rosters(
+    league["league_id"]
+)
+
+players = client.get_players()
+
+mapper = SleeperLeagueMapper()
+
+league_state = mapper.build_league_state(
+    user=user,
+    league=league,
+    rosters=rosters,
+    players=players,
+)
+
 st.header("👑 Owner Dashboard")
 
 owner_col1, owner_col2, owner_col3, owner_col4 = st.columns(4)
 
-owner_col1.metric("Owner", "Jeremie Merchant")
-owner_col2.metric("League", "Houston Gamblers")
-owner_col3.metric("Week", "8")
-owner_col4.metric("Status", "In Season")
+owner_col1.metric("Owner", league_state.owner_name)
+owner_col2.metric("League", league_state.league_name)
+owner_col3.metric("Week", league_state.week)
+owner_col4.metric("Status", "Preseason" if league_state.roster == [] else "In Season")
 
 front_office = FrontOffice()
 president = front_office.president
@@ -130,10 +156,13 @@ st.markdown(
 
 priority_col1, priority_col2, priority_col3, priority_col4 = st.columns(4)
 
-priority_col1.metric("Pending Decisions", "3")
-priority_col2.metric("Waiver Targets", "3")
-priority_col3.metric("Trade Opportunities", "1")
-priority_col4.metric("Alerts", "2")
+priority_col1.metric("Roster Size", len(league_state.roster))
+priority_col2.metric("Starters", len(league_state.starters))
+priority_col3.metric("Bench", len(league_state.bench))
+priority_col4.metric(
+    league_state.waiver_metric_label(),
+    league_state.waiver_metric_value()
+)
 
 st.divider()
 
@@ -213,17 +242,17 @@ st.header("📋 Player Explorer")
 
 position_filter = st.selectbox(
     "Filter by Position",
-    ["All"] + sorted(players["position"].dropna().unique().tolist())
+    ["All"] + sorted(players_df["position"].dropna().unique().tolist())
 )
 
 team_filter = st.selectbox(
     "Filter by Team",
-    ["All"] + sorted(players["team"].dropna().unique().tolist())
+    ["All"] + sorted(players_df["team"].dropna().unique().tolist())
 )
 
 search = st.text_input("Search Player")
 
-filtered_players = players.copy()
+filtered_players = players_df.copy()
 
 if position_filter != "All":
     filtered_players = filtered_players[filtered_players["position"] == position_filter]
