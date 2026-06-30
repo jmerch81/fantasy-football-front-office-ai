@@ -14,6 +14,20 @@ class SleeperLeagueMapper:
             players=players,
         )
 
+        starter_ids = self._clean_player_ids(
+            owner_roster.get("starters", [])
+        )
+
+        bench_ids = self._find_bench_ids(
+            roster_ids=owner_roster.get("players", []),
+            starter_ids=starter_ids,
+        )
+
+        bench_players = self._map_player_ids_to_players(
+            player_ids=bench_ids,
+            players=players,
+        )
+
         return LeagueState(
             league_id=league["league_id"],
             league_name=league["name"],
@@ -22,7 +36,8 @@ class SleeperLeagueMapper:
             owner_name=user["display_name"],
             owner_team_name=user["display_name"],
             roster=roster_players,
-            starters=owner_roster.get("starters", []),
+            starters=starter_ids,
+            bench=bench_players,
             waiver_order=owner_roster.get("settings", {}).get("waiver_position"),
             faab_remaining=owner_roster.get("settings", {}).get("waiver_budget_used"),
         )
@@ -52,3 +67,19 @@ class SleeperLeagueMapper:
                 })
 
         return mapped_players
+    
+    def _clean_player_ids(self, player_ids):
+        return [
+            player_id
+            for player_id in player_ids
+            if player_id and player_id != "0"
+        ]
+    
+    def _find_bench_ids(self, roster_ids, starter_ids):
+        clean_roster_ids = self._clean_player_ids(roster_ids)
+
+        return [
+            player_id
+            for player_id in clean_roster_ids
+            if player_id not in starter_ids
+        ]
