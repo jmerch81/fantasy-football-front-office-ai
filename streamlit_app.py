@@ -5,6 +5,7 @@ from src.executives.front_office import FrontOffice
 from src.meetings.executive_meeting import ExecutiveMeeting
 from src.integrations.sleeper import SleeperClient
 from src.league.sleeper_mapper import SleeperLeagueMapper
+from src.brain.league_aware_recommendations import get_league_aware_recommendation
 
 st.set_page_config(
     page_title="Fantasy Football Front Office AI",
@@ -133,7 +134,10 @@ owner_col4.metric("Status", "Preseason" if league_state.roster == [] else "In Se
 
 front_office = FrontOffice()
 president = front_office.president
-president_recommendation = president.make_recommendation()
+president_recommendation = get_league_aware_recommendation(
+    president,
+    league_state,
+)
 
 st.markdown(
     f"""
@@ -242,7 +246,10 @@ st.header("🏢 Executive Staff Status")
 front_office = FrontOffice()
 
 president = front_office.president
-president_recommendation = president.make_recommendation()
+president_recommendation = get_league_aware_recommendation(
+    president,
+    league_state,
+)
 
 st.markdown(
     f"""
@@ -272,7 +279,10 @@ st.subheader("Executive Leadership Team")
 executive_cards = []
 
 for executive in front_office.executives:
-    recommendation = executive.make_recommendation()
+    recommendation = get_league_aware_recommendation(
+        executive,
+        league_state,
+    )
 
     executive_cards.append({
         "title": executive.title,
@@ -352,7 +362,13 @@ meeting = ExecutiveMeeting(
 
 st.success(meeting.call_to_order())
 
-reports = meeting.collect_reports()
+reports = [
+    get_league_aware_recommendation(
+        executive,
+        league_state,
+    )
+    for executive in front_office.executives
+]
 
 for report in reports:
 
@@ -370,4 +386,9 @@ for report in reports:
 
 st.header("👔 President's Summary")
 
-st.info(meeting.summarize_meeting())
+top_report = max(reports, key=lambda report: report.confidence)
+
+st.info(
+    f"President's Summary: {top_report.recommendation} "
+    f"Current organizational priority is based on live league state."
+)
