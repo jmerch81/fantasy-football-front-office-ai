@@ -1,16 +1,18 @@
 import pandas as pd
 import streamlit as st
 from pathlib import Path
+
 from src.executives.front_office import FrontOffice
 from src.meetings.executive_meeting import ExecutiveMeeting
 from src.integrations.sleeper import SleeperClient
 from src.league.sleeper_mapper import SleeperLeagueMapper
 from src.brain.league_aware_recommendations import get_league_aware_recommendation
 
+
 st.set_page_config(
     page_title="Fantasy Football Front Office AI",
     page_icon="🏈",
-    layout="wide"
+    layout="wide",
 )
 
 st.markdown(
@@ -69,10 +71,13 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+
 PROJECT_ROOT = Path(__file__).resolve().parent
 PLAYER_DATA_PATH = PROJECT_ROOT / "data" / "processed" / "sleeper_players_clean.csv"
 
 players_df = pd.read_csv(PLAYER_DATA_PATH)
+
 
 st.markdown(
     """
@@ -88,7 +93,11 @@ st.write("Welcome back, Mr. Merchant. Your AI front office is standing by.")
 col1, col2, col3, col4 = st.columns(4)
 
 total_players = len(players_df)
-active_players = len(players_df[players_df["status"] == "Active"]) if "status" in players_df.columns else 0
+active_players = (
+    len(players_df[players_df["status"] == "Active"])
+    if "status" in players_df.columns
+    else 0
+)
 teams = players_df["team"].nunique()
 positions = players_df["position"].nunique()
 
@@ -98,6 +107,11 @@ col3.metric("NFL Teams", teams)
 col4.metric("Positions", positions)
 
 st.divider()
+
+
+# ---------------------------------------------------------
+# Sidebar League Import
+# ---------------------------------------------------------
 
 st.sidebar.header("🏈 League Import")
 
@@ -115,6 +129,7 @@ selected_season = st.sidebar.number_input(
 )
 
 client = SleeperClient()
+use_demo_roster = False
 
 try:
     user = client.get_user(sleeper_username)
@@ -157,24 +172,60 @@ try:
         players=player_database,
     )
 
+    use_demo_roster = st.sidebar.checkbox(
+        "Use Demo Roster",
+        value=False,
+    )
+
+    if use_demo_roster and len(league_state.roster) == 0:
+        demo_players = (
+            players_df[
+                (players_df["status"] == "Active")
+                & (players_df["position"].isin(["QB", "RB", "WR", "TE", "K", "DEF"]))
+            ]
+            .dropna(subset=["full_name", "position"])
+            .groupby("position")
+            .head(3)
+            .to_dict("records")
+        )
+
+        league_state.roster = demo_players
+        league_state.starters = demo_players[:9]
+        league_state.bench = demo_players[9:]
+
+        st.sidebar.info("Demo roster loaded")
+
     st.sidebar.success("League connected")
 
 except Exception as error:
     st.error("Unable to connect to Sleeper league.")
     st.exception(error)
     st.stop()
-    
+
+
+# ---------------------------------------------------------
+# Owner Dashboard
+# ---------------------------------------------------------
+
 st.header("👑 Owner Dashboard")
 
 owner_col1, owner_col2, owner_col3, owner_col4 = st.columns(4)
 
+if use_demo_roster:
+    team_status = "Demo Mode"
+elif len(league_state.roster) == 0:
+    team_status = "Preseason"
+else:
+    team_status = "In Season"
+
 owner_col1.metric("Owner", league_state.owner_name)
 owner_col2.metric("League", league_state.league_name)
 owner_col3.metric("Week", league_state.week)
-owner_col4.metric("Status", "Preseason" if league_state.roster == [] else "In Season")
+owner_col4.metric("Status", team_status)
 
 front_office = FrontOffice()
 president = front_office.president
+
 president_recommendation = get_league_aware_recommendation(
     president,
     league_state,
@@ -193,7 +244,7 @@ st.markdown(
 <h3>🏆 Today's Priority</h3>
 <div class="priority-text">{president_recommendation.recommendation}</div>
 <p><strong>Executive Consensus:</strong> {president_recommendation.confidence:.0%}</p>
-<p><strong>Owner Action Required:</strong> Review recommendation and prepare waiver strategy.</p>
+<p><strong>Owner Action Required:</strong> Review recommendation and prepare roster strategy.</p>
 </div>
 """,
     unsafe_allow_html=True,
@@ -206,12 +257,15 @@ priority_col2.metric("Starters", len(league_state.starters))
 priority_col3.metric("Bench", len(league_state.bench))
 priority_col4.metric(
     league_state.waiver_metric_label(),
-    league_state.waiver_metric_value()
+    league_state.waiver_metric_value(),
 )
 
 st.divider()
 
-st.divider()
+
+# ---------------------------------------------------------
+# Live Roster
+# ---------------------------------------------------------
 
 st.header("🏈 Live Roster")
 
@@ -220,16 +274,24 @@ if len(league_state.roster) == 0:
         "Roster not drafted yet. Complete a draft or connect a league with active rosters to activate roster analysis."
     )
 else:
+    if use_demo_roster:
+        st.info("Demo roster mode is active. These players are sample roster data for product testing.")
+
+    starter_players = league_state.starters if league_state.starters else league_state.roster
+    bench_players = league_state.bench
+
+    st.subheader("Starting Lineup")
+
     positions = ["QB", "RB", "WR", "TE", "K", "DEF"]
 
     for position in positions:
         position_players = [
-            player for player in league_state.roster
+            player for player in starter_players
             if player.get("position") == position
         ]
 
         if position_players:
-            st.subheader(position)
+            st.markdown(f"### {position}")
 
             cols = st.columns(3)
 
@@ -253,8 +315,6 @@ else:
 """,
                         unsafe_allow_html=True,
                     )
-
-    bench_players = league_state.bench
 
     if bench_players:
         st.subheader("Bench")
@@ -282,11 +342,17 @@ else:
                     unsafe_allow_html=True,
                 )
 
+st.divider()
+
+
+# ---------------------------------------------------------
+# Executive Staff Status
+# ---------------------------------------------------------
+
 st.header("🏢 Executive Staff Status")
 
-front_office = FrontOffice()
-
 president = front_office.president
+
 president_recommendation = get_league_aware_recommendation(
     president,
     league_state,
@@ -355,21 +421,26 @@ for index, card in enumerate(executive_cards):
 <p><strong>Confidence:</strong> {card["confidence"]:.0%}</p>
 </div>
 """,
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
 
 st.divider()
+
+
+# ---------------------------------------------------------
+# Player Explorer
+# ---------------------------------------------------------
 
 st.header("📋 Player Explorer")
 
 position_filter = st.selectbox(
     "Filter by Position",
-    ["All"] + sorted(players_df["position"].dropna().unique().tolist())
+    ["All"] + sorted(players_df["position"].dropna().unique().tolist()),
 )
 
 team_filter = st.selectbox(
     "Filter by Team",
-    ["All"] + sorted(players_df["team"].dropna().unique().tolist())
+    ["All"] + sorted(players_df["team"].dropna().unique().tolist()),
 )
 
 search = st.text_input("Search Player")
@@ -377,10 +448,14 @@ search = st.text_input("Search Player")
 filtered_players = players_df.copy()
 
 if position_filter != "All":
-    filtered_players = filtered_players[filtered_players["position"] == position_filter]
+    filtered_players = filtered_players[
+        filtered_players["position"] == position_filter
+    ]
 
 if team_filter != "All":
-    filtered_players = filtered_players[filtered_players["team"] == team_filter]
+    filtered_players = filtered_players[
+        filtered_players["team"] == team_filter
+    ]
 
 if search:
     filtered_players = filtered_players[
@@ -391,9 +466,14 @@ st.dataframe(filtered_players, use_container_width=True)
 
 st.write(f"Showing {len(filtered_players):,} players")
 
-st.header("🏛 Tuesday Executive Meeting")
+st.divider()
 
-front_office = FrontOffice()
+
+# ---------------------------------------------------------
+# Tuesday Executive Meeting
+# ---------------------------------------------------------
+
+st.header("🏛 Tuesday Executive Meeting")
 
 meeting = ExecutiveMeeting(
     meeting_name="Tuesday Executive Meeting",
@@ -412,17 +492,11 @@ reports = [
 ]
 
 for report in reports:
-
     with st.container():
-
         st.subheader(report.executive)
-
         st.write(f"**Recommendation:** {report.recommendation}")
-
         st.progress(report.confidence)
-
         st.caption(report.justification)
-
         st.divider()
 
 st.header("👔 President's Summary")
