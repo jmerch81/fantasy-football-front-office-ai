@@ -178,7 +178,96 @@ def build_demo_roster(players_df):
         if player:
             demo_roster.append(player)
 
+    has_defense = any(
+        player.get("position") == "DEF"
+        for player in demo_roster
+    )
+
+    if not has_defense:
+        demo_roster.append({
+            "player_id": "DAL_DEF_DEMO",
+            "full_name": "Dallas Cowboys Defense",
+            "position": "DEF",
+            "team": "DAL",
+            "status": "Active",
+            "injury_status": None,
+        })
+
+        demo_roster.append({
+            "player_id": "BAL_DEF_DEMO",
+            "full_name": "Baltimore Ravens Defense",
+            "position": "DEF",
+            "team": "BAL",
+            "status": "Active",
+            "injury_status": None,
+        })
+
     return demo_roster
+
+
+LINEUP_SLOTS = [
+    {"label": "QB", "eligible": ["QB"]},
+    {"label": "RB", "eligible": ["RB"]},
+    {"label": "RB", "eligible": ["RB"]},
+    {"label": "WR", "eligible": ["WR"]},
+    {"label": "WR", "eligible": ["WR"]},
+    {"label": "TE", "eligible": ["TE"]},
+    {"label": "W R T", "eligible": ["WR", "RB", "TE"]},
+    {"label": "W R T", "eligible": ["WR", "RB", "TE"]},
+    {"label": "K", "eligible": ["K"]},
+    {"label": "DEF", "eligible": ["DEF"]},
+]
+
+
+def build_lineup_slots(roster):
+    available_players = roster.copy()
+    lineup = []
+
+    for slot in LINEUP_SLOTS:
+        selected_player = None
+
+        for player in available_players:
+            if player.get("position") in slot["eligible"]:
+                selected_player = player
+                break
+
+        if selected_player:
+            available_players.remove(selected_player)
+
+        lineup.append({
+            "slot": slot["label"],
+            "player": selected_player,
+        })
+
+    bench = available_players
+
+    return lineup, bench
+
+def render_roster_row(slot_label, player=None, is_bench=False):
+    if player is None:
+        player_name = "Empty"
+        player_details = ""
+    else:
+        player_name = clean_display_value(player.get("full_name"), "Unknown Player")
+        team = clean_display_value(player.get("team"), "FA")
+        status = clean_display_value(player.get("status"), "Unknown")
+        injury = clean_display_value(player.get("injury_status"), "None")
+        player_details = f"Team: {team} | Status: {status} | Injury: {injury}"
+
+    slot_color = "#93C5FD" if is_bench else "#60A5FA"
+
+    st.markdown(
+        f"""
+<div style="display: flex; align-items: center; border-radius: 14px; padding: 16px; margin-bottom: 12px; background-color: #111827; border: 1px solid #2D3748;">
+<div style="width: 64px; text-align: center; border-radius: 10px; padding: 10px; margin-right: 16px; background-color: #1F2937; font-weight: 800; color: {slot_color};">{slot_label}</div>
+<div>
+<div style="font-size: 18px; font-weight: 800;">{player_name}</div>
+<div style="font-size: 13px; color: #A0AEC0;">{player_details}</div>
+</div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
 
 
 st.markdown(
@@ -282,9 +371,15 @@ try:
     if use_demo_roster and len(league_state.roster) == 0:
         demo_players = build_demo_roster(players_df)
 
+        demo_lineup_slots, demo_bench_players = build_lineup_slots(demo_players)
+
         league_state.roster = demo_players
-        league_state.starters = demo_players[:9]
-        league_state.bench = demo_players[9:]
+        league_state.starters = [
+            lineup_slot["player"]
+            for lineup_slot in demo_lineup_slots
+            if lineup_slot["player"] is not None
+        ]
+        league_state.bench = demo_bench_players
 
         st.sidebar.info("Curated demo roster loaded")
 
@@ -370,73 +465,36 @@ else:
     if use_demo_roster:
         st.info("Demo roster mode is active. These players are sample roster data for product testing.")
 
-    starter_players = league_state.starters if league_state.starters else league_state.roster
-    bench_players = league_state.bench
+    lineup_slots, bench_players = build_lineup_slots(league_state.roster)
 
-    st.subheader("Starting Lineup")
+    st.subheader("STARTERS")
+    st.caption("Lineup slots are automatically filled based on roster eligibility.")
 
-    positions = ["QB", "RB", "WR", "TE", "K", "DEF"]
+    for lineup_slot in lineup_slots:
+        render_roster_row(
+            slot_label=lineup_slot["slot"],
+            player=lineup_slot["player"],
+            is_bench=False,
+        )
 
-    for position in positions:
-        position_players = [
-            player for player in starter_players
-            if player.get("position") == position
-        ]
+    st.subheader("BENCH")
 
-        if position_players:
-            st.markdown(f"### {position}")
-
-            cols = st.columns(3)
-
-            for index, player in enumerate(position_players):
-                with cols[index % 3]:
-                    st.markdown(
-                        f"""
-<div style="
-    border: 1px solid #333;
-    border-radius: 14px;
-    padding: 16px;
-    margin-bottom: 16px;
-    background-color: #111827;
-">
-<h4>{clean_display_value(player.get("full_name"), "Unknown Player")}</h4>
-<p><strong>Team:</strong> {clean_display_value(player.get("team"), "FA")}</p>
-<p><strong>Position:</strong> {clean_display_value(player.get("position"), "N/A")}</p>
-<p><strong>Status:</strong> {clean_display_value(player.get("status"), "Unknown")}</p>
-<p><strong>Injury:</strong> {clean_display_value(player.get("injury_status"), "None")}</p>
-</div>
-""",
-                        unsafe_allow_html=True,
-                    )
-
-    if bench_players:
-        st.subheader("Bench")
-
-        cols = st.columns(3)
-
-        for index, player in enumerate(bench_players):
-            with cols[index % 3]:
-                st.markdown(
-                    f"""
-<div style="
-    border: 1px solid #333;
-    border-radius: 14px;
-    padding: 16px;
-    margin-bottom: 16px;
-    background-color: #111827;
-">
-<h4>{clean_display_value(player.get("full_name"), "Unknown Player")}</h4>
-<p><strong>Team:</strong> {clean_display_value(player.get("team"), "FA")}</p>
-<p><strong>Position:</strong> {clean_display_value(player.get("position"), "N/A")}</p>
-<p><strong>Status:</strong> {clean_display_value(player.get("status"), "Unknown")}</p>
-<p><strong>Injury:</strong> {clean_display_value(player.get("injury_status"), "None")}</p>
-</div>
-""",
-                    unsafe_allow_html=True,
-                )
+    if not bench_players:
+        for _ in range(5):
+            render_roster_row(
+                slot_label="BN",
+                player=None,
+                is_bench=True,
+            )
+    else:
+        for player in bench_players:
+            render_roster_row(
+                slot_label="BN",
+                player=player,
+                is_bench=True,
+            )
 
 st.divider()
-
 
 # ---------------------------------------------------------
 # Executive Staff Status
