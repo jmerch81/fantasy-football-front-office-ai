@@ -496,7 +496,14 @@ active_players = (
     if "status" in players_df.columns
     else 0
 )
-teams = players_df["team"].nunique()
+NFL_TEAMS = [
+    "ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE",
+    "DAL", "DEN", "DET", "GB", "HOU", "IND", "JAX", "KC",
+    "LV", "LAC", "LAR", "MIA", "MIN", "NE", "NO", "NYG",
+    "NYJ", "PHI", "PIT", "SEA", "SF", "TB", "TEN", "WAS"
+]
+
+teams = players_df[players_df["team"].isin(NFL_TEAMS)]["team"].nunique()
 positions = players_df["position"].nunique()
 
 col1.metric("NFL Players", f"{total_players:,}")
