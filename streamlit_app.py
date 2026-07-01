@@ -336,6 +336,49 @@ def analyze_lineup_decision(roster):
         "coach_recommendation": coach_recommendation,
     }
 
+def analyze_injury_risk(roster):
+    injury_flags = []
+
+    for player in roster:
+        injury_status = player.get("injury_status")
+
+        if injury_status and str(injury_status).lower() not in ["none", "nan"]:
+            injury_flags.append(player)
+
+    questionable_players = [
+        player for player in injury_flags
+        if str(player.get("injury_status")).lower() == "questionable"
+    ]
+
+    out_players = [
+        player for player in injury_flags
+        if str(player.get("injury_status")).lower() in ["out", "ir", "doubtful"]
+    ]
+
+    if len(injury_flags) == 0:
+        risk_level = "Low"
+        medical_recommendation = (
+            "No major injury risk detected. Continue monitoring injury reports before lineup lock."
+        )
+    elif len(out_players) > 0:
+        risk_level = "High"
+        medical_recommendation = (
+            "High injury risk detected. Replace unavailable players and prepare backup options immediately."
+        )
+    else:
+        risk_level = "Moderate"
+        medical_recommendation = (
+            "Monitor questionable players closely and identify backup options before kickoff."
+        )
+
+    return {
+        "injury_flags": injury_flags,
+        "questionable_players": questionable_players,
+        "out_players": out_players,
+        "risk_level": risk_level,
+        "medical_recommendation": medical_recommendation,
+    }
+
 st.markdown(
     """
     <div class="main-title">🏟️ Fantasy Football Front Office AI</div>
@@ -738,6 +781,73 @@ else:
         st.warning(
             f"FLEX slots need attention: {filled_flex_count}/{total_flex_count} filled."
         )
+
+st.divider()
+
+# ---------------------------------------------------------
+# Injury Risk Intelligence
+# ---------------------------------------------------------
+
+st.header("🩺 Injury Risk Intelligence")
+
+if len(league_state.roster) == 0:
+    st.warning(
+        "Injury intelligence will activate once a roster is drafted or demo mode is enabled."
+    )
+else:
+    injury_report = analyze_injury_risk(league_state.roster)
+
+    injury_col1, injury_col2, injury_col3, injury_col4 = st.columns(4)
+
+    injury_col1.metric("Risk Level", injury_report["risk_level"])
+    injury_col2.metric("Injury Flags", len(injury_report["injury_flags"]))
+    injury_col3.metric("Questionable", len(injury_report["questionable_players"]))
+    injury_col4.metric("Out / IR / Doubtful", len(injury_report["out_players"]))
+
+    st.subheader("Sports Medicine Recommendation")
+
+    st.markdown(
+        f"""
+<div style="
+    border: 1px solid #2D3748;
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 16px;
+    background-color: #111827;
+">
+<h4>Sports Medicine Director</h4>
+<p>{injury_report["medical_recommendation"]}</p>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    if injury_report["injury_flags"]:
+        st.subheader("Players to Monitor")
+
+        for player in injury_report["injury_flags"]:
+            player_name = clean_display_value(
+                player.get("full_name"),
+                "Unknown Player",
+            )
+            position = clean_display_value(
+                player.get("position"),
+                "N/A",
+            )
+            team = clean_display_value(
+                player.get("team"),
+                "FA",
+            )
+            injury_status = clean_display_value(
+                player.get("injury_status"),
+                "Unknown",
+            )
+
+            st.warning(
+                f"{player_name} | {position} | {team} | Injury Status: {injury_status}"
+            )
+    else:
+        st.success("No injury flags detected across the current roster.")
 
 st.divider()
 
