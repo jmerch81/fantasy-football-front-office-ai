@@ -379,6 +379,53 @@ def analyze_injury_risk(roster):
         "medical_recommendation": medical_recommendation,
     }
 
+def collect_executive_reports(front_office, league_state):
+    reports = [
+        get_league_aware_recommendation(
+            executive,
+            league_state,
+        )
+        for executive in front_office.executives
+    ]
+
+    president_report = get_league_aware_recommendation(
+        front_office.president,
+        league_state,
+    )
+
+    return [president_report] + reports
+
+
+def build_front_office_verdict(reports):
+    top_report = max(
+        reports,
+        key=lambda report: report.confidence,
+    )
+
+    average_confidence = sum(
+        report.confidence for report in reports
+    ) / len(reports)
+
+    aligned_departments = [
+        report.executive
+        for report in reports
+        if report.confidence >= 0.85
+    ]
+
+    risks = []
+
+    for report in reports:
+        risks.extend(report.risks)
+
+    unique_risks = list(dict.fromkeys(risks))
+
+    return {
+        "top_report": top_report,
+        "average_confidence": average_confidence,
+        "aligned_departments": aligned_departments,
+        "risks": unique_risks,
+    }
+
 st.markdown(
     """
     <div class="main-title">🏟️ Fantasy Football Front Office AI</div>
@@ -848,6 +895,79 @@ else:
             )
     else:
         st.success("No injury flags detected across the current roster.")
+
+st.divider()
+
+# ---------------------------------------------------------
+# Executive Consensus Summary
+# ---------------------------------------------------------
+
+st.header("🏛️ Executive Consensus Summary")
+
+if len(league_state.roster) == 0:
+    st.warning(
+        "Executive consensus will activate once a roster is drafted or demo mode is enabled."
+    )
+else:
+    consensus_reports = collect_executive_reports(
+        front_office,
+        league_state,
+    )
+
+    front_office_verdict = build_front_office_verdict(
+        consensus_reports
+    )
+
+    top_report = front_office_verdict["top_report"]
+
+    consensus_col1, consensus_col2, consensus_col3 = st.columns(3)
+
+    consensus_col1.metric(
+        "Final Confidence",
+        f"{front_office_verdict['average_confidence']:.0%}",
+    )
+
+    consensus_col2.metric(
+        "Departments Aligned",
+        len(front_office_verdict["aligned_departments"]),
+    )
+
+    consensus_col3.metric(
+        "Risks Identified",
+        len(front_office_verdict["risks"]),
+    )
+
+    st.markdown(
+        f"""
+<div style="
+    border: 2px solid #D4AF37;
+    border-radius: 18px;
+    padding: 24px;
+    margin-top: 18px;
+    margin-bottom: 18px;
+    background: linear-gradient(135deg, #111827 0%, #16213E 100%);
+">
+<h3>Final Front Office Verdict</h3>
+<h2>{top_report.recommendation}</h2>
+<p><strong>Lead Department:</strong> {top_report.executive}</p>
+<p><strong>Confidence:</strong> {top_report.confidence:.0%}</p>
+<p><strong>Why:</strong> {top_report.justification}</p>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    st.subheader("Owner Action Plan")
+
+    st.success(
+        "Review the lineup, monitor injury updates, and use the current roster structure as the baseline for weekly decisions."
+    )
+
+    if front_office_verdict["risks"]:
+        st.subheader("Key Risks to Monitor")
+
+        for risk in front_office_verdict["risks"][:5]:
+            st.warning(risk)
 
 st.divider()
 
