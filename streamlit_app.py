@@ -426,6 +426,58 @@ def build_front_office_verdict(reports):
         "risks": unique_risks,
     }
 
+def build_beta_readiness_status(
+    league_state,
+    use_demo_roster,
+    lineup_decision,
+    injury_report,
+    executive_reports,
+):
+    checks = [
+        {
+            "item": "League Connected",
+            "ready": bool(league_state.league_id),
+            "details": league_state.league_name or "No league connected",
+        },
+        {
+            "item": "Roster Loaded",
+            "ready": len(league_state.roster) > 0,
+            "details": f"{len(league_state.roster)} players loaded",
+        },
+        {
+            "item": "Lineup Intelligence",
+            "ready": lineup_decision is not None,
+            "details": "Lineup analysis active" if lineup_decision else "Lineup analysis inactive",
+        },
+        {
+            "item": "Injury Intelligence",
+            "ready": injury_report is not None,
+            "details": "Injury analysis active" if injury_report else "Injury analysis inactive",
+        },
+        {
+            "item": "Executive Reports",
+            "ready": len(executive_reports) > 0,
+            "details": f"{len(executive_reports)} reports generated",
+        },
+        {
+            "item": "Demo Mode",
+            "ready": use_demo_roster,
+            "details": "Demo mode active" if use_demo_roster else "Using live league data",
+        },
+    ]
+
+    ready_count = sum(1 for check in checks if check["ready"])
+    total_count = len(checks)
+
+    beta_ready = ready_count >= 5
+
+    return {
+        "checks": checks,
+        "ready_count": ready_count,
+        "total_count": total_count,
+        "beta_ready": beta_ready,
+    }
+
 st.markdown(
     """
     <div class="main-title">🏟️ Fantasy Football Front Office AI</div>
@@ -742,6 +794,94 @@ else:
 <p><strong>Lead Department:</strong> {command_verdict["top_report"].executive}</p>
 <p><strong>Confidence:</strong> {command_verdict["top_report"].confidence:.0%}</p>
 <p><strong>Immediate Action:</strong> Review lineup readiness, monitor injury updates, and prepare weekly decision strategy.</p>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+st.divider()
+
+# ---------------------------------------------------------
+# Beta Launch Readiness
+# ---------------------------------------------------------
+
+st.header("🚀 Beta Launch Readiness")
+
+if len(league_state.roster) == 0:
+    beta_lineup_decision = None
+    beta_injury_report = None
+    beta_executive_reports = []
+else:
+    beta_lineup_decision = analyze_lineup_decision(league_state.roster)
+    beta_injury_report = analyze_injury_risk(league_state.roster)
+    beta_executive_reports = collect_executive_reports(
+        front_office,
+        league_state,
+    )
+
+beta_status = build_beta_readiness_status(
+    league_state=league_state,
+    use_demo_roster=use_demo_roster,
+    lineup_decision=beta_lineup_decision,
+    injury_report=beta_injury_report,
+    executive_reports=beta_executive_reports,
+)
+
+readiness_col1, readiness_col2, readiness_col3 = st.columns(3)
+
+readiness_col1.metric(
+    "Ready Checks",
+    f"{beta_status['ready_count']}/{beta_status['total_count']}",
+)
+
+readiness_col2.metric(
+    "Beta Status",
+    "Ready for Review" if beta_status["beta_ready"] else "Needs Work",
+)
+
+readiness_col3.metric(
+    "Mode",
+    "Demo" if use_demo_roster else "Live",
+)
+
+st.subheader("Launch Checklist")
+
+for check in beta_status["checks"]:
+    if check["ready"]:
+        st.success(f"✅ {check['item']}: {check['details']}")
+    else:
+        st.warning(f"⚠️ {check['item']}: {check['details']}")
+
+if beta_status["beta_ready"]:
+    st.markdown(
+        """
+<div style="
+    border: 2px solid #22C55E;
+    border-radius: 18px;
+    padding: 22px;
+    margin-top: 18px;
+    margin-bottom: 22px;
+    background-color: #052E16;
+">
+<h3>Beta Review Status</h3>
+<p>This build is ready for beta review. Core league import, roster intelligence, lineup intelligence, injury intelligence, and executive recommendations are active.</p>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown(
+        """
+<div style="
+    border: 2px solid #F59E0B;
+    border-radius: 18px;
+    padding: 22px;
+    margin-top: 18px;
+    margin-bottom: 22px;
+    background-color: #422006;
+">
+<h3>Beta Review Status</h3>
+<p>This build still needs work before beta review. Complete the missing readiness checks above.</p>
 </div>
 """,
         unsafe_allow_html=True,
