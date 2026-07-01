@@ -1254,7 +1254,7 @@ st.markdown(
 
 st.subheader("Executive Leadership Team")
 
-executive_cards = []
+executive_reports = []
 
 for executive in front_office.executives:
     recommendation = get_league_aware_recommendation(
@@ -1262,34 +1262,61 @@ for executive in front_office.executives:
         league_state,
     )
 
-    executive_cards.append({
+    executive_reports.append({
         "title": executive.title,
         "name": executive.name,
-        "recommendation": recommendation.recommendation,
-        "confidence": recommendation.confidence,
         "signature": executive.signature_phrase,
+        "recommendation": recommendation.recommendation,
+        "justification": recommendation.justification,
+        "confidence": recommendation.confidence,
+        "evidence": recommendation.evidence,
+        "risks": recommendation.risks,
+        "departments": recommendation.departments_consulted,
     })
 
-cols = st.columns(3)
+cols = st.columns(2)
 
-for index, card in enumerate(executive_cards):
-    with cols[index % 3]:
+for index, report in enumerate(executive_reports):
+    evidence_html = "".join(
+        f"<li>{item}</li>"
+        for item in report["evidence"][:3]
+    )
+
+    risks_html = "".join(
+        f"<li>{risk}</li>"
+        for risk in report["risks"][:2]
+    )
+
+    departments = ", ".join(report["departments"][:3])
+
+    with cols[index % 2]:
         st.markdown(
             f"""
 <div style="
-    border: 1px solid #333;
-    border-radius: 14px;
-    padding: 18px;
-    margin-bottom: 18px;
+    border: 1px solid #2D3748;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 20px;
     background-color: #111827;
-    min-height: 260px;
+    min-height: 430px;
 ">
-<h4>{card["title"]}</h4>
-<p><strong>{card["name"]}</strong></p>
-<p><em>{card["signature"]}</em></p>
-<p><strong>Status:</strong> <span class="status-pill">Ready</span></p>
-<p><strong>Recommendation:</strong><br>{card["recommendation"]}</p>
-<p><strong>Confidence:</strong> {card["confidence"]:.0%}</p>
+<h3>{report["title"]}</h3>
+<p><strong>{report["name"]}</strong></p>
+<p><em>{report["signature"]}</em></p>
+
+<hr>
+
+<p><strong>Recommendation:</strong><br>{report["recommendation"]}</p>
+<p><strong>Why:</strong><br>{report["justification"]}</p>
+<p><strong>Confidence:</strong> {report["confidence"]:.0%}</p>
+
+<p><strong>Evidence:</strong></p>
+<ul>{evidence_html}</ul>
+
+<p><strong>Risks:</strong></p>
+<ul>{risks_html}</ul>
+
+<p><strong>Departments Consulted:</strong><br>{departments}</p>
 </div>
 """,
             unsafe_allow_html=True,
