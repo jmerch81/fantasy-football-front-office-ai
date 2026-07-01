@@ -1,6 +1,7 @@
 import pandas as pd
 import streamlit as st
 from pathlib import Path
+from collections import Counter
 
 from src.executives.front_office import FrontOffice
 from src.meetings.executive_meeting import ExecutiveMeeting
@@ -297,6 +298,89 @@ col2.metric("Active Players", f"{active_players:,}")
 col3.metric("NFL Teams", teams)
 col4.metric("Positions", positions)
 
+def get_position_counts(roster):
+    positions = [
+        clean_display_value(player.get("position"), "Unknown")
+        for player in roster
+        if player
+    ]
+
+    return Counter(positions)
+
+
+def analyze_roster_composition(roster):
+    counts = get_position_counts(roster)
+
+    insights = []
+
+    if counts.get("QB", 0) >= 2:
+        insights.append({
+            "type": "Strength",
+            "department": "General Manager",
+            "message": "QB depth is stable with multiple starting-caliber options."
+        })
+    else:
+        insights.append({
+            "type": "Concern",
+            "department": "General Manager",
+            "message": "QB depth is thin. Add a backup or high-upside QB watchlist target."
+        })
+
+    if counts.get("RB", 0) >= 3:
+        insights.append({
+            "type": "Strength",
+            "department": "Director of Analytics",
+            "message": "RB room has enough depth to support weekly flexibility."
+        })
+    else:
+        insights.append({
+            "type": "Concern",
+            "department": "Director of Analytics",
+            "message": "RB depth may need attention. Monitor waiver backs and injury replacements."
+        })
+
+    if counts.get("WR", 0) >= 4:
+        insights.append({
+            "type": "Strength",
+            "department": "Director of Scouting",
+            "message": "WR depth is strong and gives the roster weekly matchup flexibility."
+        })
+    else:
+        insights.append({
+            "type": "Concern",
+            "department": "Director of Scouting",
+            "message": "WR depth is light. Scout upside receivers before the season starts."
+        })
+
+    if counts.get("TE", 0) >= 2:
+        insights.append({
+            "type": "Strength",
+            "department": "Head Coach",
+            "message": "TE depth gives the coaching staff lineup flexibility."
+        })
+    else:
+        insights.append({
+            "type": "Concern",
+            "department": "Head Coach",
+            "message": "TE depth is limited. Prepare a streaming plan."
+        })
+
+    if counts.get("K", 0) == 0:
+        insights.append({
+            "type": "Concern",
+            "department": "Football Intelligence",
+            "message": "No kicker found on the roster."
+        })
+
+    if counts.get("DEF", 0) == 0:
+        insights.append({
+            "type": "Concern",
+            "department": "Football Intelligence",
+            "message": "No defense found on the roster."
+        })
+
+    return counts, insights
+
 st.divider()
 
 
@@ -450,6 +534,53 @@ priority_col4.metric(
 
 st.divider()
 
+# ---------------------------------------------------------
+# Roster Composition Intelligence
+# ---------------------------------------------------------
+
+st.header("🧠 Roster Composition Intelligence")
+
+if len(league_state.roster) == 0:
+    st.warning(
+        "Roster intelligence will activate once a roster is drafted or demo mode is enabled."
+    )
+else:
+    position_counts, roster_insights = analyze_roster_composition(
+        league_state.roster
+    )
+
+    count_col1, count_col2, count_col3, count_col4, count_col5, count_col6 = st.columns(6)
+
+    count_col1.metric("QB", position_counts.get("QB", 0))
+    count_col2.metric("RB", position_counts.get("RB", 0))
+    count_col3.metric("WR", position_counts.get("WR", 0))
+    count_col4.metric("TE", position_counts.get("TE", 0))
+    count_col5.metric("K", position_counts.get("K", 0))
+    count_col6.metric("DEF", position_counts.get("DEF", 0))
+
+    st.subheader("Front Office Readout")
+
+    insight_cols = st.columns(2)
+
+    for index, insight in enumerate(roster_insights):
+        with insight_cols[index % 2]:
+            st.markdown(
+                f"""
+<div style="
+    border: 1px solid #2D3748;
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 14px;
+    background-color: #111827;
+">
+<h4>{insight["type"]}: {insight["department"]}</h4>
+<p>{insight["message"]}</p>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+
+st.divider()
 
 # ---------------------------------------------------------
 # Live Roster
