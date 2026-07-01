@@ -4,7 +4,6 @@ from pathlib import Path
 from collections import Counter
 
 from src.executives.front_office import FrontOffice
-from src.meetings.executive_meeting import ExecutiveMeeting
 from src.integrations.sleeper import SleeperClient
 from src.league.sleeper_mapper import SleeperLeagueMapper
 from src.brain.league_aware_recommendations import get_league_aware_recommendation
@@ -1329,79 +1328,38 @@ st.divider()
 # Player Explorer
 # ---------------------------------------------------------
 
-st.header("📋 Player Explorer")
+with st.expander("📋 Player Explorer", expanded=False):
+    position_filter = st.selectbox(
+        "Filter by Position",
+        ["All"] + sorted(players_df["position"].dropna().unique().tolist()),
+    )
 
-position_filter = st.selectbox(
-    "Filter by Position",
-    ["All"] + sorted(players_df["position"].dropna().unique().tolist()),
-)
+    team_filter = st.selectbox(
+        "Filter by Team",
+        ["All"] + sorted(players_df["team"].dropna().unique().tolist()),
+    )
 
-team_filter = st.selectbox(
-    "Filter by Team",
-    ["All"] + sorted(players_df["team"].dropna().unique().tolist()),
-)
+    search = st.text_input("Search Player")
 
-search = st.text_input("Search Player")
+    filtered_players = players_df.copy()
 
-filtered_players = players_df.copy()
+    if position_filter != "All":
+        filtered_players = filtered_players[
+            filtered_players["position"] == position_filter
+        ]
 
-if position_filter != "All":
-    filtered_players = filtered_players[
-        filtered_players["position"] == position_filter
-    ]
+    if team_filter != "All":
+        filtered_players = filtered_players[
+            filtered_players["team"] == team_filter
+        ]
 
-if team_filter != "All":
-    filtered_players = filtered_players[
-        filtered_players["team"] == team_filter
-    ]
+    if search:
+        filtered_players = filtered_players[
+            filtered_players["full_name"].str.contains(search, case=False, na=False)
+        ]
 
-if search:
-    filtered_players = filtered_players[
-        filtered_players["full_name"].str.contains(search, case=False, na=False)
-    ]
+    st.dataframe(filtered_players, use_container_width=True)
 
-st.dataframe(filtered_players, use_container_width=True)
-
-st.write(f"Showing {len(filtered_players):,} players")
+    st.write(f"Showing {len(filtered_players):,} players")
 
 st.divider()
-
-
-# ---------------------------------------------------------
-# Tuesday Executive Meeting
-# ---------------------------------------------------------
-
-st.header("🏛 Tuesday Executive Meeting")
-
-meeting = ExecutiveMeeting(
-    meeting_name="Tuesday Executive Meeting",
-    president=front_office.president,
-    attendees=front_office.executives,
-)
-
-st.success(meeting.call_to_order())
-
-reports = [
-    get_league_aware_recommendation(
-        executive,
-        league_state,
-    )
-    for executive in front_office.executives
-]
-
-for report in reports:
-    with st.container():
-        st.subheader(report.executive)
-        st.write(f"**Recommendation:** {report.recommendation}")
-        st.progress(report.confidence)
-        st.caption(report.justification)
-        st.divider()
-
-st.header("👔 President's Summary")
-
-top_report = max(reports, key=lambda report: report.confidence)
-
-st.info(
-    f"President's Summary: {top_report.recommendation} "
-    f"Current organizational priority is based on live league state."
-)
