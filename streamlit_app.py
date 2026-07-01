@@ -690,6 +690,66 @@ priority_col4.metric(
 st.divider()
 
 # ---------------------------------------------------------
+# Owner Command Center
+# ---------------------------------------------------------
+
+st.header("📡 Owner Command Center")
+
+if len(league_state.roster) == 0:
+    st.warning(
+        "Command Center will activate once a roster is drafted or demo mode is enabled."
+    )
+else:
+    command_lineup = analyze_lineup_decision(league_state.roster)
+    command_injury = analyze_injury_risk(league_state.roster)
+    command_reports = collect_executive_reports(front_office, league_state)
+    command_verdict = build_front_office_verdict(command_reports)
+
+    command_col1, command_col2, command_col3, command_col4 = st.columns(4)
+
+    command_col1.metric(
+        "Roster Status",
+        "Active" if len(league_state.roster) > 0 else "Not Drafted",
+    )
+
+    command_col2.metric(
+        "Lineup",
+        "Ready" if command_lineup["lineup_ready"] else "Needs Review",
+    )
+
+    command_col3.metric(
+        "Injury Risk",
+        command_injury["risk_level"],
+    )
+
+    command_col4.metric(
+        "Exec Confidence",
+        f"{command_verdict['average_confidence']:.0%}",
+    )
+
+    st.markdown(
+        f"""
+<div style="
+    border: 2px solid #D4AF37;
+    border-radius: 18px;
+    padding: 22px;
+    margin-top: 18px;
+    margin-bottom: 22px;
+    background: linear-gradient(135deg, #111827 0%, #16213E 100%);
+">
+<h3>Owner Priority Brief</h3>
+<h2>{command_verdict["top_report"].recommendation}</h2>
+<p><strong>Lead Department:</strong> {command_verdict["top_report"].executive}</p>
+<p><strong>Confidence:</strong> {command_verdict["top_report"].confidence:.0%}</p>
+<p><strong>Immediate Action:</strong> Review lineup readiness, monitor injury updates, and prepare weekly decision strategy.</p>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+st.divider()
+
+# ---------------------------------------------------------
 # Roster Composition Intelligence
 # ---------------------------------------------------------
 
