@@ -270,6 +270,71 @@ def render_roster_row(slot_label, player=None, is_bench=False):
         unsafe_allow_html=True,
     )
 
+def analyze_lineup_decision(roster):
+    lineup_slots, bench_players = build_lineup_slots(roster)
+
+    open_slots = [
+        lineup_slot
+        for lineup_slot in lineup_slots
+        if lineup_slot["player"] is None
+    ]
+
+    filled_slots = [
+        lineup_slot
+        for lineup_slot in lineup_slots
+        if lineup_slot["player"] is not None
+    ]
+
+    flex_slots = [
+        lineup_slot
+        for lineup_slot in lineup_slots
+        if lineup_slot["slot"] == "W R T"
+    ]
+
+    filled_flex_slots = [
+        lineup_slot
+        for lineup_slot in flex_slots
+        if lineup_slot["player"] is not None
+    ]
+
+    starter_injury_flags = []
+
+    for lineup_slot in filled_slots:
+        player = lineup_slot["player"]
+        injury_status = player.get("injury_status")
+
+        if injury_status and str(injury_status).lower() not in ["none", "nan"]:
+            starter_injury_flags.append(player)
+
+    lineup_ready = (
+        len(open_slots) == 0
+        and len(starter_injury_flags) == 0
+    )
+
+    if lineup_ready:
+        coach_recommendation = (
+            "Lineup is ready. Maintain current structure and monitor late-week injury updates."
+        )
+    elif len(open_slots) > 0:
+        coach_recommendation = (
+            "Lineup is not complete. Fill all open starter slots before finalizing weekly strategy."
+        )
+    else:
+        coach_recommendation = (
+            "Lineup is mostly ready, but injury risk must be reviewed before lock."
+        )
+
+    return {
+        "lineup_slots": lineup_slots,
+        "bench_players": bench_players,
+        "open_slots": open_slots,
+        "filled_slots": filled_slots,
+        "flex_slots": flex_slots,
+        "filled_flex_slots": filled_flex_slots,
+        "starter_injury_flags": starter_injury_flags,
+        "lineup_ready": lineup_ready,
+        "coach_recommendation": coach_recommendation,
+    }
 
 st.markdown(
     """
@@ -579,6 +644,100 @@ else:
 """,
                 unsafe_allow_html=True,
             )
+
+st.divider()
+
+# ---------------------------------------------------------
+# Lineup Decision Intelligence
+# ---------------------------------------------------------
+
+st.header("🎯 Lineup Decision Intelligence")
+
+if len(league_state.roster) == 0:
+    st.warning(
+        "Lineup intelligence will activate once a roster is drafted or demo mode is enabled."
+    )
+else:
+    lineup_decision = analyze_lineup_decision(league_state.roster)
+
+    status_col1, status_col2, status_col3, status_col4 = st.columns(4)
+
+    status_col1.metric(
+        "Lineup Status",
+        "Ready" if lineup_decision["lineup_ready"] else "Needs Review",
+    )
+
+    status_col2.metric(
+        "Open Slots",
+        len(lineup_decision["open_slots"]),
+    )
+
+    status_col3.metric(
+        "Injury Flags",
+        len(lineup_decision["starter_injury_flags"]),
+    )
+
+    status_col4.metric(
+        "Bench Options",
+        len(lineup_decision["bench_players"]),
+    )
+
+    st.subheader("Head Coach Recommendation")
+
+    st.markdown(
+        f"""
+<div style="
+    border: 1px solid #2D3748;
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 16px;
+    background-color: #111827;
+">
+<h4>Marcus Reed — Head Coach</h4>
+<p>{lineup_decision["coach_recommendation"]}</p>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    if lineup_decision["open_slots"]:
+        st.subheader("Open Starter Slots")
+
+        for open_slot in lineup_decision["open_slots"]:
+            st.warning(
+                f"{open_slot['slot']} slot is currently empty."
+            )
+
+    if lineup_decision["starter_injury_flags"]:
+        st.subheader("Starter Injury Watch")
+
+        for player in lineup_decision["starter_injury_flags"]:
+            player_name = clean_display_value(
+                player.get("full_name"),
+                "Unknown Player",
+            )
+            injury_status = clean_display_value(
+                player.get("injury_status"),
+                "Unknown",
+            )
+
+            st.error(
+                f"{player_name} is currently listed as {injury_status}."
+            )
+
+    st.subheader("Flex Slot Review")
+
+    filled_flex_count = len(lineup_decision["filled_flex_slots"])
+    total_flex_count = len(lineup_decision["flex_slots"])
+
+    if filled_flex_count == total_flex_count:
+        st.success(
+            f"All FLEX slots are filled: {filled_flex_count}/{total_flex_count}."
+        )
+    else:
+        st.warning(
+            f"FLEX slots need attention: {filled_flex_count}/{total_flex_count} filled."
+        )
 
 st.divider()
 
